@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"database/sql"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +12,18 @@ import (
 
 	"github.com/BurntSushi/toml"
 	_ "github.com/marcboeker/go-duckdb"
+)
+
+// Color constants for ANSI escape codes
+const (
+	ColorReset  = "\033[0m"
+	ColorRed    = "\033[31m"
+	ColorGreen  = "\033[32m"
+	ColorYellow = "\033[33m"
+	ColorBlue   = "\033[34m"
+	ColorPurple = "\033[35m"
+	ColorCyan   = "\033[36m"
+	ColorWhite  = "\033[37m"
 )
 
 type Config struct {
@@ -28,6 +41,21 @@ var logger *log.Logger
 var debugEnabled bool
 
 func main() {
+	// CLI flags
+	var configPath string
+	var logPath string
+	var showHelp bool
+	flag.StringVar(&configPath, "config", "config.toml", "Path to config TOML file")
+	flag.StringVar(&logPath, "log", "sample.log", "Path to log file to analyze")
+	flag.BoolVar(&showHelp, "help", false, "Show help message")
+	flag.Parse()
+
+	if showHelp {
+		fmt.Fprintf(os.Stderr, "Usage: %s [--config config.toml] [--log sample.log]\n", os.Args[0])
+		flag.PrintDefaults()
+		os.Exit(0)
+	}
+
 	// Setup logger
 	logger = log.New(os.Stderr, "[ducktrace] ", log.LstdFlags|log.Lshortfile)
 	logger.Println("Starting ducktrace...")
@@ -40,7 +68,7 @@ func main() {
 	must(exec(db, `CREATE TABLE logs (timestamp TIMESTAMP, level TEXT, message TEXT)`))
 	logger.Println("Created logs table")
 
-	config := loadConfig("config.toml")
+	config := loadConfig(configPath)
 	logger.Printf("Loaded config: %+v\n", config)
 	if config.LogFormat.Pattern == "" {
 		logger.Printf("Config error: LogFormat.Pattern is empty. Please check your config.toml.\n")
@@ -53,10 +81,10 @@ func main() {
 	lineRegex := regexp.MustCompile(config.LogFormat.Pattern)
 	logger.Printf("Compiled log line regex: %s\n", config.LogFormat.Pattern)
 
-	file, err := os.Open("sample.log")
+	file, err := os.Open(logPath)
 	must(err)
 	defer file.Close()
-	logger.Println("Opened sample.log for reading")
+	logger.Printf("Opened %s for reading\n", logPath)
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -122,7 +150,8 @@ func exec(db *sql.DB, query string, args ...interface{}) error {
 
 func analyzeEvent(db *sql.DB, name, startRegex, endRegex string) {
 	logger.Printf("Analyzing event: %s, startRegex=%s, endRegex=%s\n", name, startRegex, endRegex)
-	fmt.Printf("\n=== %s ===\n", name)
+	// Print event name in cyan
+	fmt.Printf("\n%s\n", colorize("=== "+name+" ===", ColorCyan))
 
 	rows, err := db.Query(`
         SELECT timestamp, message
@@ -148,18 +177,20 @@ func analyzeEvent(db *sql.DB, name, startRegex, endRegex string) {
 				logger.Printf("Matched start for event %s at %v: %s\n", name, ts, msg)
 			}
 			starts = append(starts, ts)
+			fmt.Printf("%s %s %s\n", colorize("[START]", ColorGreen), ts.Format("2006-01-02 15:04:05"), colorize(msg, ColorGreen))
 		}
 		if endR.MatchString(msg) {
 			if debugEnabled {
 				logger.Printf("Matched end for event %s at %v: %s\n", name, ts, msg)
 			}
 			ends = append(ends, ts)
+			fmt.Printf("%s %s %s\n", colorize("[ END ]", ColorYellow), ts.Format("2006-01-02 15:04:05"), colorize(msg, ColorYellow))
 		}
 	}
 
 	if len(starts) == 0 || len(ends) == 0 {
 		logger.Printf("No matches for event %s: starts=%d, ends=%d\n", name, len(starts), len(ends))
-		fmt.Println("No matches.")
+		fmt.Println(colorize("No matches.", ColorRed))
 		return
 	}
 
@@ -172,17 +203,21 @@ func analyzeEvent(db *sql.DB, name, startRegex, endRegex string) {
 	for i := 0; i < minLen; i++ {
 		d := ends[i].Sub(starts[i])
 		totalDuration += d
-		fmt.Printf("Instance %d: %v\n", i+1, d)
+		fmt.Printf("%s Instance %d: %s\n", colorize("[RESULT]", ColorPurple), i+1, colorize(d.String(), ColorPurple))
 		if debugEnabled {
 			logger.Printf("Event %s instance %d duration: %v\n", name, i+1, d)
 		}
 	}
 
 	avg := totalDuration / time.Duration(minLen)
-	fmt.Printf("Average Duration: %v\n", avg)
+	fmt.Printf("%s %s\n", colorize("Average Duration:", ColorBlue), colorize(avg.String(), ColorBlue))
 	if debugEnabled {
 		logger.Printf("Event %s average duration: %v\n", name, avg)
 	}
+}
+
+func colorize(s, color string) string {
+	return color + s + ColorReset
 }
 
 func must(err error) {
