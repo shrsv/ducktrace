@@ -9,8 +9,11 @@ Imagine your logs are a big pond, and somewhere in the reeds, important events a
 
 ```mermaid
 flowchart LR
-    A[Log File] --(parse & regex)--> B[DuckTrace]
-    B --(config.toml)--> C[Event Durations]
+    A[Log File] --> B[DuckTrace]
+    D["Config File (config.toml)"] --> B
+    B --> C1[Event 1 Duration]
+    B --> C2[Event 2 Duration]
+    B --> C3[Event 3 Duration]
 ```
 
 - **Log File**: Your application or system logs
