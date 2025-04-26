@@ -1,5 +1,7 @@
 # DuckTrace - Log Duration Analysis Tool
 
+![Dax The Duck](./banner.png)
+
 ## 🦆 Analogy: Dax the Detective Duck
 Imagine your logs are a big pond, and somewhere in the reeds, important events are hiding. Dax the Duck (that’s DuckTrace!) paddles through, finding the start and end of each event, and tells you how long each one took. No more guessing where the fish are—Dax finds them and quacks the results in color!
 
