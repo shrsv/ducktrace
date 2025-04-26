@@ -1,0 +1,17 @@
+log_level = "debug"
+
+[LogFormat]
+pattern = '^(?P<date>\d{4}-\d{2}-\d{2}) (?P<time>\d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<message>.+)$'
+
+[Events.backup]
+start_regex = 'Backup job triggered'
+end_regex = 'Backup job completed'
+
+[Events.backup_nightly]
+start_regex = 'Nightly .* started'
+end_regex = 'Nightly .* completed'
+
+[Events.error_rollback]
+start_regex = 'Deployment failed'
+end_regex = 'Rollback completed'
+
